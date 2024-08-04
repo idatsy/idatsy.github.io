@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wallet Sign-In</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            text-align: center;
+            max-width: 600px;
+            padding: 20px;
+        }
+        button {
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 10px;
+        }
+        #connectMetaMask {
+            background-color: #f6851b;
+        }
+        #connectPhantom {
+            background-color: #5058df;
+        }
+        .wallet-address {
+            font-family: monospace;
+            font-size: 14px;
+            word-break: break-all;
+            max-width: 300px;
+            margin: 20px auto;
+            padding: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        #debugInfo {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #666;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to Our dApp</h1>
+        <div class="warning">
+            <strong>Note:</strong> This page must be served from a web server to work properly with wallet extensions. 
+            If you're seeing "not installed" messages, please ensure you're not opening this file directly from your file system.
+        </div>
+        <p>Connect with MetaMask or Phantom to continue</p>
+        <button id="connectMetaMask">Connect with MetaMask</button>
+        <button id="connectPhantom">Connect with Phantom</button>
+        <p id="metaMaskAddress" class="wallet-address"></p>
+        <p id="phantomAddress" class="wallet-address"></p>
+        <div id="debugInfo"></div>
+    </div>
+
+    <script>
+        let userMetaMaskAddress = null;
+        let userPhantomAddress = null;
+        const connectMetaMaskButton = document.getElementById('connectMetaMask');
+        const connectPhantomButton = document.getElementById('connectPhantom');
+        const metaMaskAddressElement = document.getElementById('metaMaskAddress');
+        const phantomAddressElement = document.getElementById('phantomAddress');
+        const debugInfoElement = document.getElementById('debugInfo');
+
+        function updateDebugInfo(message) {
+            debugInfoElement.innerHTML += message + '<br>';
+        }
+
+        function setupMetaMaskButton() {
+            if (typeof window.ethereum !== 'undefined') {
+                connectMetaMaskButton.addEventListener('click', loginWithMetaMask);
+                updateDebugInfo('MetaMask detected');
+            } else {
+                connectMetaMaskButton.innerText = 'MetaMask not installed';
+                connectMetaMaskButton.disabled = true;
+                connectMetaMaskButton.style.backgroundColor = '#ccc';
+                updateDebugInfo('MetaMask not detected');
+            }
+        }
+
+        function setupPhantomButton() {
+            if ('solana' in window && window.solana.isPhantom) {
+                connectPhantomButton.addEventListener('click', loginWithPhantom);
+                updateDebugInfo('Phantom detected');
+            } else {
+                connectPhantomButton.innerText = 'Phantom not installed';
+                connectPhantomButton.disabled = true;
+                connectPhantomButton.style.backgroundColor = '#ccc';
+                updateDebugInfo('Phantom not detected');
+            }
+        }
+
+        async function loginWithMetaMask() {
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                userMetaMaskAddress = accounts[0];
+                metaMaskAddressElement.innerText = `MetaMask: ${userMetaMaskAddress}`;
+                connectMetaMaskButton.innerText = 'Disconnect MetaMask';
+                connectMetaMaskButton.removeEventListener('click', loginWithMetaMask);
+                connectMetaMaskButton.addEventListener('click', disconnectMetaMask);
+                updateDebugInfo('Connected to MetaMask');
+            } catch (error) {
+                console.error('Failed to connect to MetaMask:', error);
+                alert('Failed to connect to MetaMask. Please try again.');
+                updateDebugInfo('Failed to connect to MetaMask: ' + error.message);
+            }
+        }
+
+        function disconnectMetaMask() {
+            userMetaMaskAddress = null;
+            metaMaskAddressElement.innerText = '';
+            connectMetaMaskButton.innerText = 'Connect with MetaMask';
+            connectMetaMaskButton.removeEventListener('click', disconnectMetaMask);
+            connectMetaMaskButton.addEventListener('click', loginWithMetaMask);
+            updateDebugInfo('Disconnected from MetaMask');
+        }
+
+        async function loginWithPhantom() {
+            try {
+                const resp = await window.solana.connect();
+                userPhantomAddress = resp.publicKey.toString();
+                phantomAddressElement.innerText = `Phantom: ${userPhantomAddress}`;
+                connectPhantomButton.innerText = 'Disconnect Phantom';
+                connectPhantomButton.removeEventListener('click', loginWithPhantom);
+                connectPhantomButton.addEventListener('click', disconnectPhantom);
+                updateDebugInfo('Connected to Phantom');
+            } catch (error) {
+                console.error('Failed to connect to Phantom:', error);
+                alert('Failed to connect to Phantom. Please try again.');
+                updateDebugInfo('Failed to connect to Phantom: ' + error.message);
+            }
+        }
+
+        function disconnectPhantom() {
+            window.solana.disconnect();
+            userPhantomAddress = null;
+            phantomAddressElement.innerText = '';
+            connectPhantomButton.innerText = 'Connect with Phantom';
+            connectPhantomButton.removeEventListener('click', disconnectPhantom);
+            connectPhantomButton.addEventListener('click', loginWithPhantom);
+            updateDebugInfo('Disconnected from Phantom');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setupMetaMaskButton();
+            setupPhantomButton();
+            updateDebugInfo('Page loaded. Protocol: ' + window.location.protocol);
+        });
+
+        // Listen for account changes
+        if (typeof window.ethereum !== 'undefined') {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    disconnectMetaMask();
+                } else {
+                    userMetaMaskAddress = accounts[0];
+                    metaMaskAddressElement.innerText = `MetaMask: ${userMetaMaskAddress}`;
+                }
+                updateDebugInfo('MetaMask account changed');
+            });
+        }
+
+        if ('solana' in window && window.solana.isPhantom) {
+            window.solana.on('accountChanged', (publicKey) => {
+                if (publicKey) {
+                    userPhantomAddress = publicKey.toString();
+                    phantomAddressElement.innerText = `Phantom: ${userPhantomAddress}`;
+                } else {
+                    disconnectPhantom();
+                }
+                updateDebugInfo('Phantom account changed');
+            });
+        }
+    </script>
+</body>
+</html>
